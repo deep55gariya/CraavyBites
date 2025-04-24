@@ -1,0 +1,1042 @@
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { 
+  FiTrash2, 
+  FiMinus, 
+  FiPlus, 
+  FiChevronDown, 
+  FiCheck, 
+  FiMapPin, 
+  FiUser, 
+  FiCreditCard, 
+  FiGift, 
+  FiHeart,
+  FiArrowLeft,
+  FiShield
+} from "react-icons/fi";
+
+const CartPage = () => {
+  const navigate = useNavigate();
+  const [cartItems, setCartItems] = useState([]);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [addresses, setAddresses] = useState([
+    {
+      id: 1,
+      name: "Home",
+      address: "123 Gourmet Avenue, Culinary District",
+      isDefault: true,
+    },
+    {
+      id: 2,
+      name: "Office",
+      address: "456 Flavor Street, Gastronomy Tower, Floor 12",
+      isDefault: false,
+    },
+  ]);
+  const [selectedAddressId, setSelectedAddressId] = useState(1);
+  const [showAddressDropdown, setShowAddressDropdown] = useState(false);
+  const [orderForSomeoneElse, setOrderForSomeoneElse] = useState(false);
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [activeStep, setActiveStep] = useState(1);
+  const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    name: "",
+    address: "",
+    isDefault: false,
+  });
+  
+  const addressDropdownRef = useRef(null);
+  const couponInputRef = useRef(null);
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        when: "beforeChildren",
+        staggerChildren: 0.1,
+      },
+    },
+    exit: {
+      opacity: 0,
+      transition: { duration: 0.3 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: "spring", stiffness: 300, damping: 24 }
+    },
+    exit: {
+      opacity: 0,
+      y: -20,
+      transition: { duration: 0.2 }
+    }
+  };
+
+  const slideInVariants = {
+    hidden: { x: 30, opacity: 0 },
+    visible: {
+      x: 0,
+      opacity: 1,
+      transition: { type: "spring", stiffness: 400, damping: 25 }
+    }
+  };
+
+  // Calculate total price
+  const subtotal = cartItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
+  
+  const discount = appliedCoupon 
+    ? appliedCoupon.type === "percentage"
+      ? (subtotal * appliedCoupon.value) / 100
+      : appliedCoupon.value
+    : 0;
+
+  const deliveryFee = subtotal > 100 ? 0 : 5.99;
+  const serviceFee = subtotal > 0 ? 2.99 : 0;
+  const grandTotal = subtotal - discount + deliveryFee + serviceFee;
+
+  // Load cart data from localStorage on component mount
+  useEffect(() => {
+    const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
+    setCartItems(savedCart);
+
+    // Check if there's a saved coupon
+    const savedCoupon = JSON.parse(localStorage.getItem("appliedCoupon"));
+    if (savedCoupon) {
+      setAppliedCoupon(savedCoupon);
+    }
+
+    // Close address dropdown when clicking outside
+    const handleClickOutside = (event) => {
+      if (addressDropdownRef.current && !addressDropdownRef.current.contains(event.target)) {
+        setShowAddressDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Update cart in localStorage whenever it changes
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      localStorage.setItem("cart", JSON.stringify(cartItems));
+    } else {
+      localStorage.removeItem("cart");
+    }
+  }, [cartItems]);
+
+  // Handle quantity changes
+  const updateQuantity = (id, amount) => {
+    const updatedCart = cartItems.map((item) => {
+      if (item.id === id) {
+        const newQuantity = item.quantity + amount;
+        return newQuantity > 0
+          ? { ...item, quantity: newQuantity }
+          : null;
+      }
+      return item;
+    }).filter(Boolean); // Remove null items (quantity becomes 0)
+
+    setCartItems(updatedCart);
+  };
+
+  // Remove item from cart
+  const removeFromCart = (id) => {
+    const updatedCart = cartItems.filter((item) => item.id !== id);
+    setCartItems(updatedCart);
+  };
+
+  // Apply coupon
+  const applyCoupon = () => {
+    setIsApplyingCoupon(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      const coupons = {
+        "WELCOME20": { type: "percentage", value: 20, name: "New User Discount" },
+        "CHEF10": { type: "percentage", value: 10, name: "Chef's Special" },
+        "FLAT15": { type: "fixed", value: 15, name: "Flat Discount" }
+      };
+      
+      const coupon = coupons[couponCode.toUpperCase()];
+      
+      if (coupon) {
+        setAppliedCoupon({ ...coupon, code: couponCode.toUpperCase() });
+        localStorage.setItem("appliedCoupon", JSON.stringify({ 
+          ...coupon, 
+          code: couponCode.toUpperCase() 
+        }));
+        setCouponCode("");
+      } else {
+        // Show invalid coupon toast
+        const toast = document.getElementById("toast");
+        toast.innerText = "Invalid coupon code";
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 3000);
+      }
+      
+      setIsApplyingCoupon(false);
+    }, 800);
+  };
+
+  // Remove applied coupon
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    localStorage.removeItem("appliedCoupon");
+  };
+
+  // Select address
+  const selectAddress = (id) => {
+    setSelectedAddressId(id);
+    setShowAddressDropdown(false);
+  };
+
+  const getSelectedAddress = () => {
+    return addresses.find(address => address.id === selectedAddressId);
+  };
+
+  // Handle adding new address
+  const handleAddNewAddress = () => {
+    if (newAddress.name && newAddress.address) {
+      const newId = addresses.length > 0 ? Math.max(...addresses.map(a => a.id)) + 1 : 1;
+      
+      // If new address is default, update other addresses
+      let updatedAddresses = [...addresses];
+      if (newAddress.isDefault) {
+        updatedAddresses = updatedAddresses.map(addr => ({
+          ...addr,
+          isDefault: false
+        }));
+      }
+      
+      const createdAddress = {
+        id: newId,
+        name: newAddress.name,
+        address: newAddress.address,
+        isDefault: newAddress.isDefault
+      };
+      
+      setAddresses([...updatedAddresses, createdAddress]);
+      setSelectedAddressId(newId);
+      setIsAddressFormOpen(false);
+      setNewAddress({ name: "", address: "", isDefault: false });
+    }
+  };
+
+  // Handle proceeding to payment
+  const proceedToPayment = () => {
+    if (cartItems.length === 0) return;
+    
+    setIsPaymentProcessing(true);
+    
+    // Simulate processing
+    setTimeout(() => {
+      setIsPaymentProcessing(false);
+      setShowThankYou(true);
+      
+      // Clear cart after successful order
+      setTimeout(() => {
+        setCartItems([]);
+        localStorage.removeItem("cart");
+        localStorage.removeItem("appliedCoupon");
+        setAppliedCoupon(null);
+        setShowThankYou(false);
+        
+        // Redirect to menu page after order success
+        navigate("/menu");
+      }, 3000);
+    }, 2000);
+  };
+
+  // Check if proceed button should be enabled
+  const canProceed = () => {
+    if (cartItems.length === 0) return false;
+    if (orderForSomeoneElse && (!recipientName || !recipientPhone)) return false;
+    return true;
+  };
+
+  // Render cart items
+  const renderCartItems = () => {
+    if (cartItems.length === 0) {
+      return (
+        <motion.div 
+          variants={itemVariants}
+          className="flex flex-col items-center justify-center py-16"
+        >
+          <div className="w-32 h-32 mb-6 opacity-30 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+            <FiShoppingCart className="w-16 h-16 text-gray-400 dark:text-gray-500" />
+          </div>
+          <h3 className="text-xl text-gray-600 dark:text-gray-300 mb-2">Your cart is empty</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-8">Explore our menu to add delicious items</p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate("/menu")}
+            className="bg-amber-500 text-white px-8 py-3 rounded-lg font-medium hover:bg-amber-600 transition-colors"
+          >
+            Browse Menu
+          </motion.button>
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="divide-y divide-gray-100 dark:divide-gray-800"
+      >
+        {cartItems.map((item) => (
+          <AnimatePresence key={item.id}>
+            <motion.div
+              variants={itemVariants}
+              className="flex py-6 first:pt-0 last:pb-0"
+            >
+              {/* Item image */}
+              <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+                <motion.img
+                  src={item.image}
+                  alt={item.name}
+                  className="h-full w-full object-cover object-center"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+
+              {/* Item details */}
+              <div className="ml-6 flex flex-1 flex-col">
+                <div className="flex justify-between">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold text-gray-800 dark:text-white">
+                      {item.name}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {item.category}
+                      {item.tags && item.tags.length > 0 && (
+                        <span className="ml-2">
+                          {item.tags.map((tag, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 mr-1"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <p className="text-right font-medium text-gray-900 dark:text-gray-100">
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="flex flex-1 items-end justify-between mt-4">
+                  {/* Quantity controls */}
+                  <div className="flex items-center">
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => updateQuantity(item.id, -1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <FiMinus size={14} />
+                    </motion.button>
+                    <span className="mx-3 font-medium text-gray-800 dark:text-gray-200">
+                      {item.quantity}
+                    </span>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => updateQuantity(item.id, 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <FiPlus size={14} />
+                    </motion.button>
+                  </div>
+
+                  {/* Remove button */}
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => removeFromCart(item.id)}
+                    className="flex items-center text-red-500 hover:text-red-600 transition-colors"
+                  >
+                    <FiTrash2 size={16} className="mr-1" />
+                    <span className="text-sm">Remove</span>
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        ))}
+      </motion.div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-amber-50 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
+      <div className="container mx-auto px-4 py-16 md:py-24">
+        {/* Thank you overlay */}
+        <AnimatePresence>
+          {showThankYou && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl max-w-md mx-4 text-center"
+              >
+                <div className="mx-auto w-20 h-20 flex items-center justify-center bg-green-100 dark:bg-green-900 rounded-full mb-6">
+                  <FiCheck className="w-10 h-10 text-green-600 dark:text-green-400" />
+                </div>
+                <h2 className="text-2xl font-serif font-bold text-gray-800 dark:text-white mb-3">
+                  Order Confirmed!
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Your gourmet experience is being prepared with care.
+                  You'll receive updates on your order shortly.
+                </p>
+                <motion.div 
+                  className="h-2 bg-green-500 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 2.5 }}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Back button */}
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          onClick={() => navigate("/menu")}
+          className="flex items-center text-gray-600 dark:text-gray-300 hover:text-amber-500 dark:hover:text-amber-400 mb-8 transition-colors"
+        >
+          <FiArrowLeft className="mr-2" />
+          <span>Continue Shopping</span>
+        </motion.button>
+
+        {/* Page title */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-center mb-12"
+        >
+          <h1 className="text-4xl md:text-5xl font-serif font-bold bg-gradient-to-r from-amber-700 to-amber-500 bg-clip-text text-transparent">
+            Your Gourmet Selection
+          </h1>
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: "80px" }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="h-1 bg-amber-500 mx-auto my-4"
+          />
+        </motion.div>
+
+        {/* Order progress steps */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="max-w-3xl mx-auto mb-12"
+        >
+          <div className="flex justify-between relative">
+            {/* Progress line */}
+            <div className="absolute top-5 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
+              <motion.div 
+                className="h-full bg-amber-500 rounded-full" 
+                initial={{ width: 0 }}
+                animate={{ width: activeStep === 1 ? "0%" : activeStep === 2 ? "50%" : "100%" }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+
+            {/* Step 1 */}
+            <div className="flex flex-col items-center z-10">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium text-white ${activeStep >= 1 ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`}>
+                1
+              </div>
+              <span className="mt-2 text-sm font-medium text-gray-600 dark:text-gray-300">
+                Review Order
+              </span>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex flex-col items-center z-10">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium text-white ${activeStep >= 2 ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`}>
+                2
+              </div>
+              <span className="mt-2 text-sm font-medium text-gray-600 dark:text-gray-300">
+                Delivery Details
+              </span>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex flex-col items-center z-10">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium text-white ${activeStep >= 3 ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`}>
+                3
+              </div>
+              <span className="mt-2 text-sm font-medium text-gray-600 dark:text-gray-300">
+                Payment
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Main content */}
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row lg:gap-8">
+            {/* Left column - Cart items */}
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="lg:flex-1"
+            >
+              {/* Cart items */}
+              <motion.div
+                variants={itemVariants}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-8"
+              >
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-medium text-gray-800 dark:text-white">
+                    Cart Items ({cartItems.reduce((acc, item) => acc + item.quantity, 0)})
+                  </h2>
+                  {cartItems.length > 0 && (
+                    <button 
+                      onClick={() => setCartItems([])}
+                      className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+                {renderCartItems()}
+              </motion.div>
+
+              {/* Order for someone else */}
+              {cartItems.length > 0 && (
+                <motion.div
+                  variants={itemVariants}
+                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-8"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium text-gray-800 dark:text-white">
+                      Order For Someone Else
+                    </h2>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={orderForSomeoneElse}
+                        onChange={() => setOrderForSomeoneElse(!orderForSomeoneElse)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                  </div>
+                  
+                  <AnimatePresence>
+                    {orderForSomeoneElse && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Recipient Name
+                            </label>
+                            <input
+                              type="text"
+                              value={recipientName}
+                              onChange={(e) => setRecipientName(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                              placeholder="Enter recipient's name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Recipient Phone
+                            </label>
+                            <input
+                              type="tel"
+                              value={recipientPhone}
+                              onChange={(e) => setRecipientPhone(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                              placeholder="Enter recipient's phone number"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          We'll send order status updates to this number
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+
+              {/* Delivery Address */}
+              {cartItems.length > 0 && (
+                <motion.div
+                  variants={itemVariants}
+                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-8"
+                >
+                  <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+                    Delivery Address
+                  </h2>
+                  
+                  <div className="relative" ref={addressDropdownRef}>
+                    <button
+                      onClick={() => setShowAddressDropdown(!showAddressDropdown)}
+                      className="w-full flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg text-left bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <div className="mr-3 bg-amber-100 dark:bg-amber-800 rounded-full p-2">
+                          <FiMapPin className="text-amber-600 dark:text-amber-300" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">
+                            {getSelectedAddress()?.name}
+                            {getSelectedAddress()?.isDefault && (
+                              <span className="ml-2 text-xs py-0.5 px-1.5 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">
+                                Default
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {getSelectedAddress()?.address}
+                          </p>
+                        </div>
+                      </div>
+                      <FiChevronDown className={`text-gray-500 transition-transform duration-300 ${showAddressDropdown ? "transform rotate-180" : ""}`} />
+                    </button>
+                    
+                    {/* Address dropdown */}
+                    <AnimatePresence>
+                      {showAddressDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute z-30 mt-2 w-full bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden"
+                        >
+                          <div className="max-h-64 overflow-y-auto py-2">
+                            {addresses.map((address) => (
+                              <div
+                                key={address.id}
+                                onClick={() => selectAddress(address.id)}
+                                className={`px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors flex items-center justify-between ${
+                                  selectedAddressId === address.id
+                                    ? "bg-amber-50 dark:bg-amber-900/20"
+                                    : ""
+                                }`}
+                              >
+                                <div>
+                                  <p className="font-medium text-gray-800 dark:text-white">
+                                    {address.name}
+                                    {address.isDefault && (
+                                      <span className="ml-2 text-xs py-0.5 px-1.5 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">
+                                        Default
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {address.address}
+                                  </p>
+                                </div>
+                                {selectedAddressId === address.id && (
+                                  <FiCheck className="text-amber-500" />
+                                )}
+                              </div>
+                            ))}
+                            
+                            {/* Add new address option */}
+                            <div 
+                              onClick={() => {
+                                setShowAddressDropdown(false);
+                                setIsAddressFormOpen(true);
+                              }}
+                              className="px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors flex items-center text-amber-500"
+                            >
+                              <FiPlus className="mr-2" />
+                              <span>Add New Address</span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    {/* New address form modal */}
+                    <AnimatePresence>
+                      {isAddressFormOpen && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
+                        >
+                          <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+                          >
+                            <h3 className="text-xl font-serif font-bold text-gray-800 dark:text-white mb-6">
+                              Add New Address
+                            </h3>
+                            
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Address Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newAddress.name}
+                                  onChange={(e) => setNewAddress({...newAddress, name: e.target.value})}
+                                  className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                                  placeholder="Home, Office, etc."
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Full Address
+                                </label>
+                                <textarea
+                                  value={newAddress.address}
+                                  onChange={(e) => setNewAddress({...newAddress, address: e.target.value})}
+                                  className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                                  placeholder="Enter your full address"
+                                  rows={3}
+                                />
+                              </div>
+                              
+                              <div className="flex items-center">
+                                <input
+                                  id="default-address"
+                                  type="checkbox"
+                                  checked={newAddress.isDefault}
+                                  onChange={(e) => setNewAddress({...newAddress, isDefault: e.target.checked})}
+                                  className="h-4 w-4 text-amber-500 border-gray-300 rounded focus:ring-amber-500"
+                                />
+                                <label htmlFor="default-address" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                                  Set as default address
+                                </label>
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-end mt-6 space-x-3">
+                              <button
+                                onClick={() => setIsAddressFormOpen(false)}
+                                className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleAddNewAddress}
+                                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                              >
+                                Save Address
+                              </button>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+
+            {/* Right column - Order summary */}
+            <motion.div 
+              variants={slideInVariants}
+              initial="hidden"
+              animate="visible"
+              className="lg:w-96"
+            >
+              {/* Coupon section */}
+              {cartItems.length > 0 && (
+                <motion.div 
+                  variants={itemVariants}
+                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-8"
+                >
+                  <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+                    Have a Coupon?
+                  </h2>
+                  
+                  {appliedCoupon ? (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-lg p-3">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <div className="bg-green-100 dark:bg-green-800 rounded-full p-2 mr-3">
+                            <FiCheck className="text-green-600 dark:text-green-400" size={16} />
+                          </div>
+                          <div>
+                            <span className="block text-sm font-medium text-gray-800 dark:text-white">
+                              {appliedCoupon.name}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Code: {appliedCoupon.code}
+                            </span>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={removeCoupon}
+                          className="text-sm text-red-500 hover:text-red-600 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="mt-2 text-sm text-green-700 dark:text-green-400">
+                        {appliedCoupon.type === "percentage" 
+                          ? `${appliedCoupon.value}% off your order`
+                          : `$${appliedCoupon.value.toFixed(2)} off your order`
+                        }
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        ref={couponInputRef}
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-800 dark:text-white pr-24"
+                        placeholder="Enter coupon code"
+                      />
+                      <button
+                        onClick={applyCoupon}
+                        disabled={!couponCode || isApplyingCoupon}
+                        className={`absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                          couponCode && !isApplyingCoupon
+                            ? "bg-amber-500 text-white hover:bg-amber-600"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        {isApplyingCoupon ? (
+                          <span className="flex items-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Applying
+                          </span>
+                        ) : (
+                          "Apply"
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {!appliedCoupon && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button 
+                        onClick={() => setCouponCode("WELCOME20")}
+                        className="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-650 text-gray-600 dark:text-gray-300 px-2 py-1 rounded transition-colors"
+                      >
+                        WELCOME20
+                      </button>
+                      <button 
+                        onClick={() => setCouponCode("CHEF10")}
+                        className="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-650 text-gray-600 dark:text-gray-300 px-2 py-1 rounded transition-colors"
+                      >
+                        CHEF10
+                      </button>
+                      <button 
+                        onClick={() => setCouponCode("FLAT15")}
+                        className="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-650 text-gray-600 dark:text-gray-300 px-2 py-1 rounded transition-colors"
+                      >
+                        FLAT15
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Order summary */}
+              <motion.div 
+                variants={itemVariants}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sticky top-8"
+              >
+                <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-6">
+                  Order Summary
+                </h2>
+                
+                {cartItems.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Add items to see your order summary
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4 mb-6">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-medium">${subtotal.toFixed(2)}</span>
+                      </div>
+                      
+                      {discount > 0 && (
+                        <div className="flex justify-between text-green-600 dark:text-green-400">
+                          <span>Discount</span>
+                          <span>-${discount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+                        <span className="text-gray-800 dark:text-gray-200">
+                          {deliveryFee === 0 ? (
+                            <span className="text-green-600 dark:text-green-400">Free</span>
+                          ) : (
+                            `$${deliveryFee.toFixed(2)}`
+                          )}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Service Fee</span>
+                        <span className="text-gray-800 dark:text-gray-200">${serviceFee.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="border-t border-gray-100 dark:border-gray-700 pt-4 flex justify-between">
+                        <span className="text-lg font-medium text-gray-800 dark:text-white">Total</span>
+                        <motion.span 
+                          key={grandTotal}
+                          initial={{ scale: 1.2, color: "#f59e0b" }}
+                          animate={{ scale: 1, color: "#1f2937" }}
+                          className="text-lg font-bold text-gray-800 dark:text-white"
+                        >
+                          ${grandTotal.toFixed(2)}
+                        </motion.span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center text-sm text-green-600 dark:text-green-400 mb-6">
+                      <FiShield className="mr-2" />
+                      <span>100% Secure Payment</span>
+                    </div>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={!canProceed() || isPaymentProcessing}
+                      onClick={proceedToPayment}
+                      className={`w-full py-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-all ${
+                        canProceed() && !isPaymentProcessing
+                          ? "bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
+                      {isPaymentProcessing ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </span>
+                      ) : (
+                        <>
+                          <FiCreditCard size={18} />
+                          <span>Proceed to Pay</span>
+                        </>
+                      )}
+                    </motion.button>
+                    
+                    {cartItems.length > 0 && (
+                      <div className="flex flex-wrap gap-2 justify-center mt-4">
+                        {["visa", "mastercard", "amex", "paypal", "apple-pay"].map((payment) => (
+                          <div 
+                            key={payment}
+                            className="h-6 w-10 bg-gray-100 dark:bg-gray-700 rounded opacity-70"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Animated background elements */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-200 dark:bg-amber-900/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-amber-300 dark:bg-amber-800/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-amber-100 dark:bg-amber-700/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+      </div>
+
+      {/* Toast notification */}
+      <div 
+        id="toast" 
+        className="fixed bottom-8 right-8 bg-gray-800 dark:bg-gray-700 text-white p-4 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-500 z-50"
+      />
+      
+      {/* Animations CSS */}
+      <style jsx>{`
+        @keyframes blob {
+          0% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+        }
+        .animate-blob {
+          animation: blob 12s infinite ease-in-out;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        #toast.show {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default CartPage;
