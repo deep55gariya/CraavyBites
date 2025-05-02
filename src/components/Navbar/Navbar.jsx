@@ -144,9 +144,9 @@ const Navbar = ({ theme, setTheme }) => {
                 </li>
               ))}
               
-              {/* Button Section */}
+{/*               
               <div className="ml-4 flex items-center gap-4">
-                {/* Sign In/Out Button */}
+                
                 {isLoggedIn ? (
                   <button
                     onClick={handleSignOut}
@@ -171,7 +171,7 @@ const Navbar = ({ theme, setTheme }) => {
                     Sign In
                   </a>
                 )}
-
+ */}
                 {/* Theme Toggle */}
                 <div 
                   className="p-2 rounded-full cursor-pointer transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800"
