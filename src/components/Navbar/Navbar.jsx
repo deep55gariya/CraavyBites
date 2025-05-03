@@ -144,7 +144,7 @@ const Navbar = ({ theme, setTheme }) => {
                 </li>
               ))}
               
-{/*               
+               
               <div className="ml-4 flex items-center gap-4">
                 
                 {isLoggedIn ? (
@@ -171,7 +171,7 @@ const Navbar = ({ theme, setTheme }) => {
                     Sign In
                   </a>
                 )}
- */}
+ 
                 {/* Theme Toggle */}
                 <div 
                   className="p-2 rounded-full cursor-pointer transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800"
